@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <title>Membership Crowdsale</title>
-  <script src="https://cdn.jsdelivr.net/npm/ethers/dist/ethers.min.js"></script>
+  <script src="https://cdn.ethers.io/lib/ethers-5.2.umd.min.js"></script>
   <style>
     body { font-family: sans-serif; max-width: 600px; margin: 2em auto; }
     button { padding: 10px 20px; margin-top: 1em; }
@@ -24,9 +24,8 @@
   </div>
 
   <script>
-    const provider = new ethers.providers.Web3Provider(window.ethereum);
+    let provider;
     let signer;
-
     const contractAddress = "0xE8D5A0dE22b21Ea3805F05Eeb33C4aE94Fb2fe61";
     const abi = [
       "function price() view returns (uint256)",
@@ -34,43 +33,22 @@
       "function deadline() view returns (uint256)",
       "function contribute(uint256 amount) payable"
     ];
+    let contract;
 
-    const contract = new ethers.Contract(contractAddress, abi, provider);
+    async function init() {
+      if (!window.ethereum) {
+        document.getElementById("status").textContent = "MetaMask not found.";
+        return;
+      }
 
-    async function loadData() {
-      const [price, raised, deadline] = await Promise.all([
-        contract.price(),
-        contract.totalRaised(),
-        contract.deadline()
-      ]);
-
-      const ethPrice = ethers.utils.formatEther(price);
-      const ethRaised = ethers.utils.formatEther(raised);
-      const endDate = new Date(deadline.toNumber() * 1000);
-
-      document.getElementById("price").textContent = ethPrice;
-      document.getElementById("raised").textContent = ethRaised;
-      document.getElementById("deadline").textContent = endDate.toLocaleString();
-      document.getElementById("status").textContent = "Open";
-    }
-
-    async function contribute() {
+      provider = new ethers.providers.Web3Provider(window.ethereum);
       await provider.send("eth_requestAccounts", []);
       signer = provider.getSigner();
-      const contractWithSigner = contract.connect(signer);
+      contract = new ethers.Contract(contractAddress, abi, provider);
 
-      const amount = parseInt(document.getElementById("amount").value);
-      const pricePerToken = await contract.price();
-      const totalCost = pricePerToken.mul(amount);
-
-      const tx = await contractWithSigner.contribute(amount, { value: totalCost });
-      document.getElementById("status").textContent = "Transaction sent...";
-      await tx.wait();
-      document.getElementById("status").textContent = "Contribution successful!";
       loadData();
     }
 
-    loadData();
-  </script>
-</body>
-</html>
+    async function loadData() {
+      try {
+        cons
