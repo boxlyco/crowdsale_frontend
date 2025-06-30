@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Membership Crowdsale</title>
+  <script src="https://cdn.jsdelivr.net/npm/ethers/dist/ethers.min.js"></script>
+  <style>
+    body { font-family: sans-serif; max-width: 600px; margin: 2em auto; }
+    button { padding: 10px 20px; margin-top: 1em; }
+    input { padding: 5px; width: 50px; }
+  </style>
+</head>
+<body>
+  <h2>Membership Crowdsale</h2>
+  <p><strong>Status:</strong> <span id="status">Loading...</span></p>
+  <p><strong>Price per Token:</strong> <span id="price">--</span> ETH</p>
+  <p><strong>Amount Raised:</strong> <span id="raised">--</span> ETH</p>
+  <p><strong>Deadline:</strong> <span id="deadline">--</span></p>
+
+  <div>
+    <label for="amount">Amount to Buy:</label>
+    <input id="amount" type="number" value="1" min="1">
+    <button onclick="contribute()">Contribute</button>
+  </div>
+
+  <script>
+    const provider = new ethers.providers.Web3Provider(window.ethereum);
+    let signer;
+
+    const contractAddress = "<CROWDSALE_CONTRACT_ADDRESS>";
+    const abi = [
+      "function price() view returns (uint256)",
+      "function totalRaised() view returns (uint256)",
+      "function deadline() view returns (uint256)",
+      "function contribute(uint256 amount) payable"
+    ];
+
+    const contract = new ethers.Contract(contractAddress, abi, provider);
+
+    async function loadData() {
+      const [price, raised, deadline] = await Promise.all([
+        contract.price(),
+        contract.totalRaised(),
+        contract.deadline()
+      ]);
+
+      const ethPrice = ethers.utils.formatEther(price);
+      const ethRaised = ethers.utils.formatEther(raised);
+      const endDate = new Date(deadline.toNumber() * 1000);
+
+      document.getElementById("price").textContent = ethPrice;
+      document.getElementById("raised").textContent = ethRaised;
+      document.getElementById("deadline").textContent = endDate.toLocaleString();
+      document.getElementById("status").textContent = "Open";
+    }
+
+    async function contribute() {
+      await provider.send("eth_requestAccounts", []);
+      signer = provider.getSigner();
+      const contractWithSigner = contract.connect(signer);
+
+      const amount = parseInt(document.getElementById("amount").value);
+      const pricePerToken = await contract.price();
+      const totalCost = pricePerToken.mul(amount);
+
+      const tx = await contractWithSigner.contribute(amount, { value: totalCost });
+      document.getElementById("status").textContent = "Transaction sent...";
+      await tx.wait();
+      document.getElementById("status").textContent = "Contribution successful!";
+      loadData();
+    }
+
+    loadData();
+  </script>
+</body>
+</html>
