@@ -3,8 +3,6 @@
 <head>
   <meta charset="UTF-8">
   <title>Membership Crowdsale</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
-
   <style>
     body { font-family: sans-serif; max-width: 600px; margin: 2em auto; }
     button { padding: 10px 20px; margin-top: 1em; }
@@ -21,12 +19,12 @@
   <div>
     <label for="amount">Amount to Buy:</label>
     <input id="amount" type="number" value="1" min="1">
-    <button onclick="contribute()">Contribute</button>
+    <button id="contributeButton">Contribute</button>
   </div>
 
-  <script>
-    let provider;
-    let signer;
+  <script type="module">
+    import { ethers } from "https://cdn.jsdelivr.net/npm/ethers@6.10.0/+esm";
+
     const contractAddress = "0xE8D5A0dE22b21Ea3805F05Eeb33C4aE94Fb2fe61";
     const abi = [
       "function price() view returns (uint256)",
@@ -34,6 +32,9 @@
       "function deadline() view returns (uint256)",
       "function contribute(uint256 amount) payable"
     ];
+
+    let provider;
+    let signer;
     let contract;
 
     async function init() {
@@ -42,9 +43,9 @@
         return;
       }
 
-      provider = new ethers.providers.Web3Provider(window.ethereum);
+      provider = new ethers.BrowserProvider(window.ethereum);
       await provider.send("eth_requestAccounts", []);
-      signer = provider.getSigner();
+      signer = await provider.getSigner();
       contract = new ethers.Contract(contractAddress, abi, provider);
 
       loadData();
@@ -52,4 +53,50 @@
 
     async function loadData() {
       try {
-        cons
+        const [price, raised, deadline] = await Promise.all([
+          contract.price(),
+          contract.totalRaised(),
+          contract.deadline()
+        ]);
+
+        const ethPrice = ethers.formatEther(price);
+        const ethRaised = ethers.formatEther(raised);
+        const endDate = new Date(Number(deadline) * 1000);
+
+        document.getElementById("price").textContent = ethPrice;
+        document.getElementById("raised").textContent = ethRaised;
+        document.getElementById("deadline").textContent = endDate.toLocaleString();
+        document.getElementById("status").textContent = "Open";
+      } catch (err) {
+        console.error(err);
+        document.getElementById("status").textContent = "Error loading data.";
+      }
+    }
+
+    async function contribute() {
+      try {
+        const amount = parseInt(document.getElementById("amount").value);
+        const pricePerToken = await contract.price();
+        const totalCost = pricePerToken * BigInt(amount);
+
+        const contractWithSigner = contract.connect(signer);
+        const tx = await contractWithSigner.contribute(amount, {
+          value: totalCost
+        });
+
+        document.getElementById("status").textContent = "Transaction sent...";
+        await tx.wait();
+        document.getElementById("status").textContent = "Contribution successful!";
+        loadData();
+      } catch (err) {
+        console.error(err);
+        document.getElementById("status").textContent = "Transaction failed.";
+      }
+    }
+
+    document.getElementById("contributeButton").addEventListener("click", contribute);
+
+    init();
+  </script>
+</body>
+</html>
